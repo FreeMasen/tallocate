@@ -1,0 +1,7 @@
+[package]
+name = "tallocate"
+version = "0.1.0"
+authors = ["FreeMasen"]
+
+[dependencies]
+clap = { version = "*", features = ["yaml"] }
