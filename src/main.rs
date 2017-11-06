@@ -3,27 +3,25 @@ use std::fs::{File};
 extern crate clap;
 use clap::{Arg, App, ArgMatches};
 
+extern crate blobber;
+
 fn main() {
     let matches = get_matches();
-    let size_str = matches.value_of("size").expect("size is required");
+    let size_str = matches.value_of("size").unwrap_or("1m");
     let size = parse_file_size(size_str);
-    let path = matches.value_of("outfile").expect("outfile is require");
+    let path = matches.value_of("outfile").unwrap_or("out.txt");
     println!("output: {}", path);
     let file = File::create(path).expect("Unable to create file");
     let mut w_buf = BufWriter::new(file);
-    let lorem = "0. Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.";
-    let whole_blocks = size / lorem.as_bytes().len();
-    println!("actual output size: {}", get_file_size((whole_blocks + 1) * lorem.as_bytes().len()));
-    for i in 0..(whole_blocks + 1) {
-        lorem.replace("0. ", format!("{}. ", i).as_str());
-        w_buf.write_all(lorem.as_bytes()).expect("write failed");
-    }
+    let lorem = blobber::get_lorem(size, true);
+    println!("actual output size: {}", get_file_size(lorem.as_bytes().len()));
+    w_buf.write_all(lorem.as_bytes()).expect("write failed");
 }
 
 fn get_file_size(size: usize) -> String {
     let mut counter = 0;
     let mut updated_size = size as f32;
-    while updated_size > 1024.0 {
+    while updated_size >= 1024.0 {
         updated_size /= 1024.0;
         counter += 1;
     }
@@ -60,12 +58,44 @@ fn get_matches() ->  ArgMatches<'static> {
             .arg(Arg::with_name("size")
                 .short("s")
                 .long("size")
-                .required(true)
-                .takes_value(true))
+                .takes_value(true)
+                .required(false))
             .arg(Arg::with_name("outfile")
                 .short("o")
                 .long("outfile")
-                .required(true)
-                .takes_value(true))
+                .takes_value(true)
+                .required(false))
             .get_matches()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn number_to_text() {
+        let bytes = get_file_size(10);
+        assert_eq!(bytes, "10.00 bytes".to_string());
+        let kilobytes = get_file_size(1024);
+        assert_eq!(kilobytes, "1.00 kilobytes".to_string());
+        let mega = get_file_size(1024 * 1024);
+        assert_eq!(mega, "1.00 megabytes".to_string());
+        let gig = get_file_size(1024 * 1024 * 1024);
+        assert_eq!(gig, "1.00 gigabytes".to_string());
+        let tera = get_file_size(1024 * 1024 * 1024 * 1024);
+        assert_eq!(tera, "1.00 terabytes".to_string());
+        let peta = get_file_size(1024 * 1024 * 1024 * 1024 * 1024);
+        assert_eq!(peta, "1.00 petabytes".to_string());
+    }
+
+    #[test]
+    fn text_to_number() {
+        let bytes = parse_file_size("10");
+        assert_eq!(bytes, 10);
+        let kilo = parse_file_size("1k");
+        assert_eq!(kilo, 1024);
+        let meg = parse_file_size("1m");
+        assert_eq!(meg, 1024 * 1024);
+        let gig = parse_file_size("1g");
+        assert_eq!(gig, 1024 * 1024 * 1024);
+    }
 }
